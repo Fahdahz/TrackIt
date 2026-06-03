@@ -1,14 +1,14 @@
 //
-//  HabitAppApp.swift
+//  HabitApp.swift
 //  HabitApp
 //
-//  Created by dana on 25/11/1447 AH.
+//  Created by Fahdah Alsamari on 17/12/1447 AH.
 //
 
 import SwiftUI
 
 @main
-struct HabitAppApp: App {
+struct HabitApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
