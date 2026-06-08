@@ -257,8 +257,7 @@ struct JournalListView: View {
                 .padding()
             }
 
-            CustomTabBar()
-        }
+            CustomTabBar(selectedIndex: .constant(2))        }
 
         // MARK: Date Picker
 

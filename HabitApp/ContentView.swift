@@ -1,263 +1,257 @@
-//
 //  ContentView.swift
 //  HabitApp
-//
-//  Created by Fahdah Alsamari on 17/12/1447 AH.
 //
 
 import SwiftUI
 
 struct ContentView: View {
-    @State private var runningCompleted = 0
-    @State private var waterCompleted = 0
-    @State private var readingCompleted = 0
-    @State private var openedMenu: String? = nil
-    @State private var selectedCard = 1
+    var initialHabits: [Habit] = []
+    
+    // قائمة العادات فارغة بشكل افتراضي
+    @State private var habits: [Habit] = []
+    
+    @State private var openedMenuID: UUID? = nil
+    @State private var selectedCard = 0
+    @State private var showAddHabit = false
+    @State private var editingHabit: Habit? = nil
+    @State private var selectedTab = 0
 
     var body: some View {
         ZStack {
-            ZStack(alignment: .topLeading) {
-                Color("BackgroundCream")
-                    .ignoresSafeArea()
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("DAILY HABITS")
-                        .font(.system(size: 16, weight: .regular, design: .serif))
-                        .foregroundColor(Color("PrimaryOrange"))
-
-                    Text("KEEP GOING!🔥")
-                        .font(.system(size: 25, weight: .bold, design: .serif))
-                        .foregroundColor(.black)
-                }
-                .padding(.top, 25)
-                .padding(.leading, 28)
-                .blur(radius: openedMenu == nil ? 0 : 6)
-
-                VStack {
-                    HStack {
-                        Spacer()
-
-                        Button(action: {
-                            // Add Habit
-                        }) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color("BackgroundCream"))
-                                    .frame(width: 64, height: 63)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(
-                                                Color("PrimaryOrange").opacity(0.23),
-                                                lineWidth: 1
-                                            )
-                                    )
-                                    .overlay(
-                                        Circle()
-                                            .stroke(
-                                                LinearGradient(
-                                                    colors: [
-                                                        Color("PrimaryOrange").opacity(0.65),
-                                                        Color("PrimaryOrange").opacity(0.18),
-                                                        Color("PrimaryOrange").opacity(0.08),
-                                                        Color("PrimaryOrange").opacity(0.18)
-                                                    ],
-                                                    startPoint: .top,
-                                                    endPoint: .bottom
-                                                ),
-                                                lineWidth: 2.2
-                                            )
-                                            .blur(radius: 0.6)
-                                    )
-                                    .shadow(
-                                        color: Color("PrimaryOrange").opacity(0.18),
-                                        radius: 9,
-                                        x: 0,
-                                        y: 1
-                                    )
-
-                                Image(systemName: "plus")
-                                    .font(.system(size: 32, weight: .bold))
-                                    .foregroundColor(Color("PrimaryOrange"))
-                            }
-                        }
-                    }
-
-                    Spacer()
-                }
-                .padding(.top, 32)
-                .padding(.trailing, 28)
-                .blur(radius: openedMenu == nil ? 0 : 6)
-
-                VStack {
-                    Spacer()
-                        .frame(height: 250)
-
-                    HabitCarousel(
-                        selectedCard: $selectedCard,
-                        openedMenu: $openedMenu,
-                        runningCompleted: $runningCompleted,
-                        waterCompleted: $waterCompleted,
-                        readingCompleted: $readingCompleted
-                    )
-                    .blur(radius: openedMenu == nil ? 0 : 6)
+            // Tab content
+            Group {
+                if selectedTab == 0 {
+                    homeView
+                } else if selectedTab == 1 {
+                    Progress()
+                } else {
+                    Color("BackgroundCream").ignoresSafeArea()
                 }
             }
 
-            if openedMenu != nil {
+            // Dim + menu overlay
+            if openedMenuID != nil {
                 Color.black.opacity(0.12)
                     .ignoresSafeArea()
-                    .onTapGesture {
-                        openedMenu = nil
-                    }
+                    .onTapGesture { openedMenuID = nil }
 
-                HabitMenu()
+                if let id = openedMenuID {
+                    HabitMenu(
+                        onFreeze: {
+                            if let i = habits.firstIndex(where: { $0.id == id }) {
+                                habits[i].isFrozen.toggle()
+                            }
+                            openedMenuID = nil
+                        },
+                        onEdit: {
+                            editingHabit = habits.first(where: { $0.id == id })
+                            openedMenuID = nil
+                        },
+                        onDelete: {
+                            habits.removeAll { $0.id == id }
+                            if selectedCard >= habits.count { selectedCard = max(0, habits.count - 1) }
+                            openedMenuID = nil
+                        },
+                        isFrozen: habits.first(where: { $0.id == id })?.isFrozen ?? false
+                    )
+                }
+            }
+
+            // Tab bar
+            VStack {
+                Spacer()
+                CustomTabBar(selectedIndex: $selectedTab)
+            }
+            .ignoresSafeArea(edges: .bottom)
+        }
+        // Add new habit
+        .sheet(isPresented: $showAddHabit) {
+            AddHabitSheet { newHabit in
+                habits.append(newHabit)
+                selectedCard = habits.count - 1
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.hidden)
+        }
+        // Edit existing habit
+        .sheet(item: $editingHabit) { habit in
+            AddHabitSheet(editingHabit: habit) { updated in
+                if let i = habits.firstIndex(where: { $0.id == habit.id }) {
+                    habits[i] = updated
+                }
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.hidden)
+        }
+    }
+
+    // MARK: - Home View
+    var homeView: some View {
+        ZStack(alignment: .topLeading) {
+            Color("BackgroundCream").ignoresSafeArea()
+
+            // Header
+            VStack(alignment: .leading, spacing: 8) {
+                Text("DAILY HABITS")
+                    .font(.system(size: 16, weight: .regular, design: .serif))
+                    .foregroundColor(Color("PrimaryOrange"))
+                Text("KEEP GOING!🔥")
+                    .font(.system(size: 25, weight: .bold, design: .serif))
+                    .foregroundColor(.black)
+            }
+            .padding(.top, 25)
+            .padding(.leading, 28)
+            .blur(radius: openedMenuID == nil ? 0 : 6)
+
+            // Plus button
+            VStack {
+                HStack {
+                    Spacer()
+                    Button { showAddHabit = true } label: {
+                        ZStack {
+                            Circle()
+                                .fill(Color("BackgroundCream"))
+                                .frame(width: 64, height: 63)
+                                .overlay(Circle().stroke(Color("PrimaryOrange").opacity(0.23), lineWidth: 1))
+                                .overlay(
+                                    Circle()
+                                        .stroke(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color("PrimaryOrange").opacity(0.65),
+                                                    Color("PrimaryOrange").opacity(0.18),
+                                                    Color("PrimaryOrange").opacity(0.08),
+                                                    Color("PrimaryOrange").opacity(0.18)
+                                                ],
+                                                startPoint: .top, endPoint: .bottom
+                                            ),
+                                            lineWidth: 2.2
+                                        )
+                                        .blur(radius: 0.6)
+                                )
+                                .shadow(color: Color("PrimaryOrange").opacity(0.18), radius: 9, x: 0, y: 1)
+                            Image(systemName: "plus")
+                                .font(.system(size: 32, weight: .bold))
+                                .foregroundColor(Color("PrimaryOrange"))
+                        }
+                    }
+                }
+                Spacer()
+            }
+            .padding(.top, 32)
+            .padding(.trailing, 28)
+            .blur(radius: openedMenuID == nil ? 0 : 6)
+
+            // Carousel
+            VStack {
+                Spacer().frame(height: 250)
+                if habits.isEmpty {
+                    Text("No habits yet!\nTap + to add one.")
+                        .multilineTextAlignment(.center)
+                        .font(.system(size: 18, weight: .medium, design: .serif))
+                        .foregroundColor(Color("PrimaryOrange").opacity(0.6))
+                        .frame(maxWidth: .infinity)
+                } else {
+                    HabitCarousel(
+                        habits: $habits,
+                        selectedCard: $selectedCard,
+                        openedMenuID: $openedMenuID
+                    )
+                    .blur(radius: openedMenuID == nil ? 0 : 6)
+                }
             }
         }
     }
 }
 
+// MARK: - Carousel
+
 struct HabitCarousel: View {
+    @Binding var habits: [Habit]
     @Binding var selectedCard: Int
-    @Binding var openedMenu: String?
-    @Binding var runningCompleted: Int
-    @Binding var waterCompleted: Int
-    @Binding var readingCompleted: Int
+    @Binding var openedMenuID: UUID?
 
     var body: some View {
         VStack(spacing: 22) {
             GeometryReader { geo in
                 ZStack {
-                    carouselCard(
-                        index: 0,
-                        title: "Running",
-                        icon: "🏃🏻‍♀️",
-                        completed: $runningCompleted,
-                        total: 1
-                    )
-
-                    carouselCard(
-                        index: 1,
-                        title: "Drinking water",
-                        icon: "💧",
-                        completed: $waterCompleted,
-                        total: 8
-                    )
-
-                    carouselCard(
-                        index: 2,
-                        title: "Reading",
-                        icon: "📚",
-                        completed: $readingCompleted,
-                        total: 1
-                    )
+                    ForEach(Array(habits.enumerated()), id: \.element.id) { index, habit in
+                        carouselCard(index: index)
+                    }
                 }
-                .frame(width: geo.size.width, height: 325)
+                .frame(width: geo.size.width, height: 360)
                 .gesture(
-                    DragGesture()
-                        .onEnded { value in
-                            if value.translation.width < -40 && selectedCard < 2 {
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedCard += 1
-                                }
-                            }
-
-                            if value.translation.width > 40 && selectedCard > 0 {
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedCard -= 1
-                                }
-                            }
+                    DragGesture().onEnded { value in
+                        if value.translation.width < -40 && selectedCard < habits.count - 1 {
+                            withAnimation(.easeInOut(duration: 0.25)) { selectedCard += 1 }
                         }
+                        if value.translation.width > 40 && selectedCard > 0 {
+                            withAnimation(.easeInOut(duration: 0.25)) { selectedCard -= 1 }
+                        }
+                    }
                 )
             }
-            .frame(height: 325)
+            .frame(height: 360)
 
+            // Dots
             HStack(spacing: 14) {
-                Circle()
-                    .fill(selectedCard == 0 ? Color.black : Color.gray.opacity(0.55))
-                    .frame(width: 12, height: 12)
-
-                Circle()
-                    .fill(selectedCard == 1 ? Color.black : Color.gray.opacity(0.55))
-                    .frame(width: 12, height: 12)
-
-                Circle()
-                    .fill(selectedCard == 2 ? Color.black : Color.gray.opacity(0.55))
-                    .frame(width: 12, height: 12)
+                ForEach(0..<habits.count, id: \.self) { i in
+                    Circle()
+                        .fill(selectedCard == i ? Color.black : Color.gray.opacity(0.55))
+                        .frame(width: 12, height: 12)
+                }
             }
         }
     }
 
-    func carouselCard(
-        index: Int,
-        title: String,
-        icon: String,
-        completed: Binding<Int>,
-        total: Int
-    ) -> some View {
+    func carouselCard(index: Int) -> some View {
         let isSelected = selectedCard == index
-        let cardGap: CGFloat = 34
-        let selectedWidth: CGFloat = 222
-        let smallWidth: CGFloat = 110
+        let cardGap: CGFloat = 30
+        
+        let selectedWidth: CGFloat = 250
+        let smallWidth: CGFloat = 120
+        
         let xOffset = CGFloat(index - selectedCard) * ((selectedWidth / 2) + (smallWidth / 2) + cardGap)
 
         return HabitCard(
-            title: title,
-            icon: icon,
-            completed: completed,
-            total: total,
-            openedMenu: $openedMenu,
-            isSelected: isSelected
+            habit: $habits[index],
+            isSelected: isSelected,
+            onMenuTap: { openedMenuID = habits[index].id }
         )
-        .frame(
-            width: isSelected ? 222 : 110,
-            height: isSelected ? 294 : 275
-        )
-        .offset(
-            x: xOffset,
-            y: isSelected ? -8 : 12
-        )
+        .frame(width: isSelected ? 250 : 120, height: isSelected ? 330 : 300)
+        .offset(x: xOffset, y: isSelected ? -8 : 12)
         .zIndex(isSelected ? 2 : 1)
         .animation(.easeInOut(duration: 0.25), value: selectedCard)
         .onTapGesture {
             if isSelected {
-                if completed.wrappedValue < total {
-                    completed.wrappedValue += 1
+                if !habits[index].isFrozen && habits[index].completed < habits[index].amountPerDay {
+                    habits[index].completed += 1
                 }
             } else {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    selectedCard = index
-                }
+                withAnimation(.easeInOut(duration: 0.25)) { selectedCard = index }
             }
         }
     }
 }
 
+// MARK: - Habit Card
+
 struct HabitCard: View {
-    let title: String
-    let icon: String
-    @Binding var completed: Int
-    let total: Int
-    @Binding var openedMenu: String?
+    @Binding var habit: Habit
     let isSelected: Bool
+    let onMenuTap: () -> Void
 
     var progress: Double {
-        Double(completed) / Double(total)
+        guard habit.amountPerDay > 0 else { return 0 }
+        return Double(habit.completed) / Double(habit.amountPerDay)
     }
-
-    var isCompleted: Bool {
-        completed >= total
-    }
+    var isCompleted: Bool { habit.completed >= habit.amountPerDay }
 
     var body: some View {
         VStack {
             HStack {
                 Spacer()
-
-                Button(action: {
-                    if isSelected {
-                        openedMenu = title
-                    }
-                }) {
+                Button(action: { if isSelected { onMenuTap() } }) {
                     Text("•••")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.gray)
@@ -267,84 +261,88 @@ struct HabitCard: View {
                 .disabled(!isSelected)
             }
 
-            Text(title)
+            Text(habit.name)
                 .font(.system(size: 20, weight: .bold, design: .serif))
-                .foregroundColor(.black)
+                .foregroundColor(habit.isFrozen ? .gray : .black)
                 .padding(.top, 2)
                 .lineLimit(1)
 
-            Spacer()
-                .frame(height: 36)
+            Spacer().frame(height: 36)
 
             ZStack {
+                Circle().stroke(Color.gray.opacity(0.20), lineWidth: 4).frame(width: 95, height: 95)
                 Circle()
-                    .stroke(Color.gray.opacity(0.20), lineWidth: 4)
-                    .frame(width: 95, height: 95)
-
-                Circle()
-                    .trim(from: 0, to: progress)
-                    .stroke(
-                        Color("PrimaryOrange"),
-                        style: StrokeStyle(lineWidth: 4, lineCap: .butt)
-                    )
+                    .trim(from: 0, to: habit.isFrozen ? 0 : progress)
+                    .stroke(Color("PrimaryOrange"), style: StrokeStyle(lineWidth: 4, lineCap: .butt))
                     .frame(width: 95, height: 95)
                     .rotationEffect(.degrees(-90))
 
-                Text(icon)
-                    .font(.system(size: 36))
+                if habit.isFrozen {
+                    Text("❄️").font(.system(size: 36))
+                } else {
+                    Text(habit.icon).font(.system(size: 36))
+                }
             }
 
-            Spacer()
-                .frame(height: 28)
+            Spacer().frame(height: 28)
 
-            if isCompleted {
+            if habit.isFrozen {
+                Text("Frozen")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.gray)
+                    .padding(.top, 8)
+            } else if isCompleted {
                 Text("Completed")
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.black)
                     .padding(.top, 18)
             } else {
                 Circle()
-                    .fill(completed > 0 ? Color("PrimaryOrange") : Color.clear)
+                    .fill(habit.completed > 0 ? Color("PrimaryOrange") : Color.clear)
                     .frame(width: 50, height: 50)
-                    .overlay(
-                        Circle()
-                            .stroke(Color("PrimaryOrange"), lineWidth: 2)
-                    )
-                    .overlay(
-                        Group {
-                            if completed > 0 {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 26, weight: .regular))
-                                    .foregroundColor(.white)
-                            }
+                    .overlay(Circle().stroke(Color("PrimaryOrange"), lineWidth: 2))
+                    .overlay(Group {
+                        if habit.completed > 0 {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 26, weight: .regular))
+                                .foregroundColor(.white)
                         }
-                    )
-
-                Text("\(completed) out of \(total)")
+                    })
+                Text("\(habit.completed) out of \(habit.amountPerDay)")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundColor(.black)
                     .padding(.top, 8)
             }
-
             Spacer()
         }
-        .background(Color("Card"))
+        .background(Color(red: 255/255, green: 254/255, blue: 248/255))
         .cornerRadius(12)
-        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.black.opacity(0.08), lineWidth: 0.8)
+        )
+        // تعديل الـ Shadow ليكون أقوى وأعمق (زيادة الـ radius والـ opacity والـ y)
+        .shadow(color: Color.black.opacity(0.12), radius: 14, x: 5, y: 6)
+        .opacity(habit.isFrozen ? 0.75 : 1)
         .clipped()
     }
 }
 
+// MARK: - Habit Menu
+
 struct HabitMenu: View {
+    let onFreeze: () -> Void
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+    let isFrozen: Bool
+
     var body: some View {
         VStack(spacing: 0) {
-            MenuRow(title: "Freeze", icon: "snowflake", color: .black)
+            MenuRow(title: isFrozen ? "Unfreeze" : "Freeze", icon: "snowflake", color: .black, action: onFreeze)
             Divider()
-
-            MenuRow(title: "Edit", icon: "pencil", color: .black)
+            MenuRow(title: "Edit", icon: "pencil", color: .black, action: onEdit)
             Divider()
-
-            MenuRow(title: "Delete", icon: "trash", color: .red)
+            MenuRow(title: "Delete", icon: "trash", color: .red, action: onDelete)
         }
         .frame(width: 230)
         .background(.ultraThinMaterial)
@@ -357,21 +355,18 @@ struct MenuRow: View {
     let title: String
     let icon: String
     let color: Color
+    let action: () -> Void
 
     var body: some View {
-        HStack {
-            Text(title)
-                .font(.system(size: 20, weight: .regular))
-                .foregroundColor(color)
-
-            Spacer()
-
-            Image(systemName: icon)
-                .font(.system(size: 20, weight: .regular))
-                .foregroundColor(color)
+        Button(action: action) {
+            HStack {
+                Text(title).font(.system(size: 20, weight: .regular)).foregroundColor(color)
+                Spacer()
+                Image(systemName: icon).font(.system(size: 20, weight: .regular)).foregroundColor(color)
+            }
+            .padding(.horizontal, 24)
+            .frame(height: 56)
         }
-        .padding(.horizontal, 24)
-        .frame(height: 56)
     }
 }
 
