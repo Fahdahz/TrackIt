@@ -148,7 +148,7 @@ struct AddHabitSheet: View {
             // Done button
             Button {
                 guard !habitName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-                let habit = Habit(
+                var habit = Habit(
                     name: habitName,
                     icon: selectedEmoji.isEmpty ? "⭐️" : selectedEmoji,
                     amountPerDay: amountPerDay,
@@ -157,6 +157,10 @@ struct AddHabitSheet: View {
                     completed: editingHabit?.completed ?? 0,
                     isFrozen: editingHabit?.isFrozen ?? false
                 )
+                // Keep the same id when editing so store.update() finds it
+                if let existing = editingHabit {
+                    habit.id = existing.id
+                }
                 onAdd(habit)
                 dismiss()
             } label: {

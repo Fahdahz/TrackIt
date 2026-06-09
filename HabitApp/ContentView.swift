@@ -1,3 +1,4 @@
+//
 //  ContentView.swift
 //  HabitApp
 //
@@ -5,11 +6,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    var initialHabits: [Habit] = []
-    
-    // قائمة العادات فارغة بشكل افتراضي
-    @State private var habits: [Habit] = []
-    
+    @EnvironmentObject var store: HabitStore
     @State private var openedMenuID: UUID? = nil
     @State private var selectedCard = 0
     @State private var showAddHabit = false
@@ -23,7 +20,7 @@ struct ContentView: View {
                 if selectedTab == 0 {
                     homeView
                 } else if selectedTab == 1 {
-                    Progress()
+                    Progress(habits: store.habits)
                 } else {
                     Color("BackgroundCream").ignoresSafeArea()
                 }
@@ -38,21 +35,21 @@ struct ContentView: View {
                 if let id = openedMenuID {
                     HabitMenu(
                         onFreeze: {
-                            if let i = habits.firstIndex(where: { $0.id == id }) {
-                                habits[i].isFrozen.toggle()
-                            }
+                            store.toggleFreeze(id: id)
                             openedMenuID = nil
                         },
                         onEdit: {
-                            editingHabit = habits.first(where: { $0.id == id })
+                            editingHabit = store.habits.first(where: { $0.id == id })
                             openedMenuID = nil
                         },
                         onDelete: {
-                            habits.removeAll { $0.id == id }
-                            if selectedCard >= habits.count { selectedCard = max(0, habits.count - 1) }
+                            store.delete(id: id)
+                            if selectedCard >= store.habits.count {
+                                selectedCard = max(0, store.habits.count - 1)
+                            }
                             openedMenuID = nil
                         },
-                        isFrozen: habits.first(where: { $0.id == id })?.isFrozen ?? false
+                        isFrozen: store.habits.first(where: { $0.id == id })?.isFrozen ?? false
                     )
                 }
             }
@@ -64,21 +61,17 @@ struct ContentView: View {
             }
             .ignoresSafeArea(edges: .bottom)
         }
-        // Add new habit
         .sheet(isPresented: $showAddHabit) {
             AddHabitSheet { newHabit in
-                habits.append(newHabit)
-                selectedCard = habits.count - 1
+                store.add(newHabit)
+                selectedCard = store.habits.count - 1
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.hidden)
         }
-        // Edit existing habit
         .sheet(item: $editingHabit) { habit in
             AddHabitSheet(editingHabit: habit) { updated in
-                if let i = habits.firstIndex(where: { $0.id == habit.id }) {
-                    habits[i] = updated
-                }
+                store.update(updated)
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.hidden)
@@ -90,7 +83,6 @@ struct ContentView: View {
         ZStack(alignment: .topLeading) {
             Color("BackgroundCream").ignoresSafeArea()
 
-            // Header
             VStack(alignment: .leading, spacing: 8) {
                 Text("DAILY HABITS")
                     .font(.system(size: 16, weight: .regular, design: .serif))
@@ -103,7 +95,6 @@ struct ContentView: View {
             .padding(.leading, 28)
             .blur(radius: openedMenuID == nil ? 0 : 6)
 
-            // Plus button
             VStack {
                 HStack {
                     Spacer()
@@ -142,10 +133,9 @@ struct ContentView: View {
             .padding(.trailing, 28)
             .blur(radius: openedMenuID == nil ? 0 : 6)
 
-            // Carousel
             VStack {
                 Spacer().frame(height: 250)
-                if habits.isEmpty {
+                if store.habits.isEmpty {
                     Text("No habits yet!\nTap + to add one.")
                         .multilineTextAlignment(.center)
                         .font(.system(size: 18, weight: .medium, design: .serif))
@@ -153,9 +143,10 @@ struct ContentView: View {
                         .frame(maxWidth: .infinity)
                 } else {
                     HabitCarousel(
-                        habits: $habits,
+                        habits: $store.habits,
                         selectedCard: $selectedCard,
-                        openedMenuID: $openedMenuID
+                        openedMenuID: $openedMenuID,
+                        onIncrement: { id in store.incrementCompleted(id: id) }
                     )
                     .blur(radius: openedMenuID == nil ? 0 : 6)
                 }
@@ -170,12 +161,13 @@ struct HabitCarousel: View {
     @Binding var habits: [Habit]
     @Binding var selectedCard: Int
     @Binding var openedMenuID: UUID?
+    var onIncrement: (UUID) -> Void
 
     var body: some View {
         VStack(spacing: 22) {
             GeometryReader { geo in
                 ZStack {
-                    ForEach(Array(habits.enumerated()), id: \.element.id) { index, habit in
+                    ForEach(Array(habits.enumerated()), id: \.element.id) { index, _ in
                         carouselCard(index: index)
                     }
                 }
@@ -193,7 +185,6 @@ struct HabitCarousel: View {
             }
             .frame(height: 360)
 
-            // Dots
             HStack(spacing: 14) {
                 ForEach(0..<habits.count, id: \.self) { i in
                     Circle()
@@ -207,10 +198,8 @@ struct HabitCarousel: View {
     func carouselCard(index: Int) -> some View {
         let isSelected = selectedCard == index
         let cardGap: CGFloat = 30
-        
         let selectedWidth: CGFloat = 250
         let smallWidth: CGFloat = 120
-        
         let xOffset = CGFloat(index - selectedCard) * ((selectedWidth / 2) + (smallWidth / 2) + cardGap)
 
         return HabitCard(
@@ -224,9 +213,7 @@ struct HabitCarousel: View {
         .animation(.easeInOut(duration: 0.25), value: selectedCard)
         .onTapGesture {
             if isSelected {
-                if !habits[index].isFrozen && habits[index].completed < habits[index].amountPerDay {
-                    habits[index].completed += 1
-                }
+                onIncrement(habits[index].id)
             } else {
                 withAnimation(.easeInOut(duration: 0.25)) { selectedCard = index }
             }
@@ -276,7 +263,7 @@ struct HabitCard: View {
                     .stroke(Color("PrimaryOrange"), style: StrokeStyle(lineWidth: 4, lineCap: .butt))
                     .frame(width: 95, height: 95)
                     .rotationEffect(.degrees(-90))
-
+                    .animation(.easeOut(duration: 0.3), value: progress)
                 if habit.isFrozen {
                     Text("❄️").font(.system(size: 36))
                 } else {
@@ -317,11 +304,7 @@ struct HabitCard: View {
         }
         .background(Color(red: 255/255, green: 254/255, blue: 248/255))
         .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.black.opacity(0.08), lineWidth: 0.8)
-        )
-        // تعديل الـ Shadow ليكون أقوى وأعمق (زيادة الـ radius والـ opacity والـ y)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.08), lineWidth: 0.8))
         .shadow(color: Color.black.opacity(0.12), radius: 14, x: 5, y: 6)
         .opacity(habit.isFrozen ? 0.75 : 1)
         .clipped()
@@ -371,5 +354,5 @@ struct MenuRow: View {
 }
 
 #Preview {
-    ContentView()
+    ContentView().environmentObject(HabitStore())
 }

@@ -8,8 +8,8 @@ import SwiftUI
 
 // MARK: - Habit
 
-struct Habit: Identifiable {
-    let id = UUID()
+struct Habit: Identifiable, Codable {
+    var id: UUID = UUID()
     var name: String
     var icon: String
     var amountPerDay: Int
@@ -22,7 +22,7 @@ struct Habit: Identifiable {
 // MARK: - JournalEntry
 
 struct JournalEntry: Identifiable {
-    let id = UUID()
+    var id: UUID = UUID()
     let habit: String
     let mood: Mood
     let date: Date

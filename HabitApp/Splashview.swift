@@ -6,14 +6,10 @@
 import SwiftUI
 
 struct SplashView: View {
+    @EnvironmentObject var store: HabitStore
+    @AppStorage("isNewUser") private var isNewUser: Bool = true
     @State private var showSplash = true
     @State private var showAddHabit = false
-    @State private var habits: [Habit] = []
-    @State private var goToMain = false
-
-    // For new users — in a real app you'd persist this with @AppStorage
-    // Set to true if user has never added a habit
-    @AppStorage("isNewUser") private var isNewUser: Bool = true
 
     var body: some View {
         Group {
@@ -26,26 +22,29 @@ struct SplashView: View {
                             }
                         }
                     }
-            } else if isNewUser && !goToMain {
+            } else if isNewUser {
                 EmptyStateView {
                     showAddHabit = true
                 }
                 .transition(.opacity)
             } else {
-                ContentView(initialHabits: habits)
+                ContentView()
                     .transition(.opacity)
             }
         }
         .sheet(isPresented: $showAddHabit) {
             AddHabitSheet { newHabit in
-                habits.append(newHabit)
+                store.add(newHabit)
                 isNewUser = false
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    goToMain = true
-                }
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.hidden)
+        }
+        // بعد إضافة أول habit انتقلي لـ ContentView
+        .onChange(of: isNewUser) { newValue in
+            if !newValue {
+                withAnimation(.easeInOut(duration: 0.5)) { }
+            }
         }
     }
 }
@@ -64,8 +63,7 @@ private struct SplashScreenView: View {
 
     var body: some View {
         ZStack {
-            Color("BackgroundCream")
-                .ignoresSafeArea()
+            Color("BackgroundCream").ignoresSafeArea()
 
             VStack(spacing: 32) {
                 Spacer()
@@ -111,20 +109,11 @@ private struct SplashScreenView: View {
 
     private func startAnimations() {
         withAnimation(.spring(response: 0.7, dampingFraction: 0.6).delay(0.2)) {
-            iconScale = 1.0
-            iconOpacity = 1.0
-            iconRotation = 0
+            iconScale = 1.0; iconOpacity = 1.0; iconRotation = 0
         }
-        withAnimation(.easeInOut(duration: 1.8).delay(0.5)) {
-            pathProgress = 1.0
-        }
-        withAnimation(.easeInOut(duration: 2.0).delay(0.6)) {
-            smallDotOffset = 1.0
-        }
-        withAnimation(.easeOut(duration: 0.7).delay(1.6)) {
-            nameOpacity = 1.0
-            nameOffset = 0
-        }
+        withAnimation(.easeInOut(duration: 1.8).delay(0.5)) { pathProgress = 1.0 }
+        withAnimation(.easeInOut(duration: 2.0).delay(0.6)) { smallDotOffset = 1.0 }
+        withAnimation(.easeOut(duration: 0.7).delay(1.6)) { nameOpacity = 1.0; nameOffset = 0 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
             withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
                 iconScale = 1.05
@@ -133,32 +122,23 @@ private struct SplashScreenView: View {
     }
 }
 
-// MARK: - Orbit Path
-
 private struct OrbitPath: Shape {
     var progress: CGFloat
-    var animatableData: CGFloat {
-        get { progress }
-        set { progress = newValue }
-    }
+    var animatableData: CGFloat { get { progress } set { progress = newValue } }
     func path(in rect: CGRect) -> Path {
         Path { p in p.addEllipse(in: rect) }.trimmedPath(from: 0, to: progress)
     }
 }
 
-// MARK: - Orbiting Dot
-
 private struct OrbitingDot: View {
     var progress: CGFloat
     var body: some View {
         GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
+            let w = geo.size.width, h = geo.size.height
             let angle = progress * 2 * .pi - .pi / 2
             let x = w / 2 + (w / 2) * cos(angle)
             let y = h / 2 + (h / 2) * sin(angle)
-            Circle()
-                .fill(Color("PrimaryOrange"))
+            Circle().fill(Color("PrimaryOrange"))
                 .frame(width: 10, height: 10)
                 .position(x: x, y: y)
                 .opacity(progress > 0.05 ? 1 : 0)
@@ -167,5 +147,5 @@ private struct OrbitingDot: View {
 }
 
 #Preview {
-    SplashView()
+    SplashView().environmentObject(HabitStore())
 }
