@@ -2,115 +2,55 @@
 //  JournalHomeView.swift
 //  HabitApp
 //
-//  Created by Fahdah Alsamari on 17/12/1447 AH.
-//
 
 import SwiftUI
 
 struct JournalHomeView: View {
+    let habits: [Habit]
 
     @State private var entries: [JournalEntry] = []
-
     @State private var showAddJournal = false
-
-    @State private var selectedHabit = "Reading"
-
+    @State private var selectedHabit: String = ""
     @State private var selectedDate: Date? = nil
 
     var body: some View {
-
         NavigationStack {
-
             ZStack {
-
-                Color("BackgroundCream")
-                    .ignoresSafeArea()
+                Color("BackgroundCream").ignoresSafeArea()
 
                 VStack(spacing: 0) {
-
-                    // MARK: Header
-
+                    // Header
                     HStack {
-
                         Text("Your journals")
-                            .font(.nyBold(30))
+                            .font(.system(size: 30, weight: .bold, design: .serif))
                             .foregroundColor(.black)
-
                         Spacer()
-
-                        Button {
-
-                            showAddJournal = true
-
-                        } label: {
-
+                        Button { showAddJournal = true } label: {
                             ZStack {
-
                                 Circle()
-                                    .fill(
-                                        Color("BackgroundCream")
-                                    )
-                                    .frame(
-                                        width: 64,
-                                        height: 63
-                                    )
-
+                                    .fill(Color("BackgroundCream"))
+                                    .frame(width: 64, height: 63)
+                                    .overlay(Circle().stroke(Color("PrimaryOrange").opacity(0.23), lineWidth: 1))
                                     .overlay(
-
                                         Circle()
                                             .stroke(
-                                                Color("PrimaryOrange")
-                                                    .opacity(0.23),
-                                                lineWidth: 1
-                                            )
-                                    )
-
-                                    .overlay(
-
-                                        Circle()
-                                            .stroke(
-
                                                 LinearGradient(
                                                     colors: [
-
-                                                        Color("PrimaryOrange")
-                                                            .opacity(0.65),
-
-                                                        Color("PrimaryOrange")
-                                                            .opacity(0.18),
-
-                                                        Color("PrimaryOrange")
-                                                            .opacity(0.08),
-
-                                                        Color("PrimaryOrange")
-                                                            .opacity(0.18)
+                                                        Color("PrimaryOrange").opacity(0.65),
+                                                        Color("PrimaryOrange").opacity(0.18),
+                                                        Color("PrimaryOrange").opacity(0.08),
+                                                        Color("PrimaryOrange").opacity(0.18)
                                                     ],
-                                                    startPoint: .top,
-                                                    endPoint: .bottom
+                                                    startPoint: .top, endPoint: .bottom
                                                 ),
                                                 lineWidth: 2.2
                                             )
                                             .blur(radius: 0.6)
                                     )
-
-                                    .shadow(
-                                        color: Color("PrimaryOrange")
-                                            .opacity(0.18),
-                                        radius: 9,
-                                        x: 0,
-                                        y: 1
-                                    )
-
+                                    .shadow(color: Color("PrimaryOrange").opacity(0.18), radius: 9, x: 0, y: 1)
                                 Image(systemName: "plus")
-                                    .font(
-                                        .system(
-                                            size: 32,
-                                            weight: .bold
-                                        )
-                                    )
-                                    .foregroundColor(
-                                        Color("PrimaryOrange")
-                                    )
+                                    .font(.system(size: 32, weight: .bold))
+                                    .foregroundColor(Color("PrimaryOrange"))
                             }
                         }
                         .buttonStyle(.plain)
@@ -118,33 +58,26 @@ struct JournalHomeView: View {
                     .padding(.horizontal)
                     .padding(.top)
 
-                    // MARK: Empty State
-
                     if entries.isEmpty {
-
                         Spacer()
-
                         VStack(spacing: 12) {
-
                             Text("How are you feeling today?")
-                                .font(.nyBold(28))
-
-                            Text(
-                                "Write about your progress. Small reflections can reveal big patterns."
-                            )
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .frame(width: 260)
+                                .font(.system(size: 28, weight: .bold, design: .serif))
+                            Text("Write about your progress. Small reflections can reveal big patterns.")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .frame(width: 260)
                         }
-
                         Spacer()
-
                     } else {
-
                         JournalListView(
                             entries: $entries,
-                            selectedHabit: $selectedHabit,
+                            habits: habits,
+                            selectedHabit: Binding(
+                                get: { selectedHabit.isEmpty ? (habits.first?.name ?? "") : selectedHabit },
+                                set: { selectedHabit = $0 }
+                            ),
                             selectedDate: $selectedDate
                         )
                     }
@@ -153,15 +86,15 @@ struct JournalHomeView: View {
                 }
             }
             .sheet(isPresented: $showAddJournal) {
-
-                AddJournalView(
-                    entries: $entries
-                )
+                AddJournalView(entries: $entries, habits: habits)
             }
         }
     }
 }
 
 #Preview {
-    JournalHomeView()
+    JournalHomeView(habits: [
+        Habit(name: "Reading", icon: "📚", amountPerDay: 1, targetDate: Date(), remindersOn: false),
+        Habit(name: "Running", icon: "🏃🏻‍♀️", amountPerDay: 1, targetDate: Date(), remindersOn: false),
+    ])
 }

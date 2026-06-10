@@ -36,6 +36,16 @@ enum Mood: String, CaseIterable {
 
     var title: String { rawValue.capitalized }
 
+    var emoji: String {
+        switch self {
+        case .happy:    return "😊"
+        case .neutral:  return "😐"
+        case .stressed: return "😰"
+        case .sad:      return "😢"
+        case .angry:    return "😠"
+        }
+    }
+
     var color: Color {
         switch self {
         case .happy:    return Color(red: 0.98, green: 0.73, blue: 0.42)

@@ -22,7 +22,7 @@ struct ContentView: View {
                 } else if selectedTab == 1 {
                     Progress(habits: store.habits)
                 } else {
-                    Color("BackgroundCream").ignoresSafeArea()
+                    JournalHomeView(habits: store.habits)
                 }
             }
 
