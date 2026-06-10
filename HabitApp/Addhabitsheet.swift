@@ -216,3 +216,7 @@ struct EmojiPickerView: View {
         .background(Color("BackgroundCream").ignoresSafeArea())
     }
 }
+
+#Preview {
+    AddHabitSheet { _ in }
+}
