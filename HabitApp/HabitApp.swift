@@ -13,6 +13,7 @@ struct HabitApp: App {
         WindowGroup {
             SplashView()
                 .environmentObject(store)
+                .preferredColorScheme(.light)
         }
     }
 }
