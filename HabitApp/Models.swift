@@ -18,6 +18,46 @@ struct Habit: Identifiable, Codable {
     var completed: Int = 0
     var isFrozen: Bool = false
     var reminderTime: Date? = nil
+
+    // 🆕 سجل الإنجاز اليومي: التاريخ (yyyy-MM-dd) -> عدد المرات المنجزة
+    var dailyProgress: [String: Int] = [:]
+}
+
+// MARK: - Habit Helpers (Daily Progress & Streak)
+
+extension Habit {
+    /// يحول التاريخ إلى مفتاح نصي ثابت بدون وقت (yyyy-MM-dd)
+    static func dayKey(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = .current
+        return formatter.string(from: date)
+    }
+
+    /// عدد مرات الإنجاز ليوم معين
+    func progress(on date: Date) -> Int {
+        dailyProgress[Habit.dayKey(for: date)] ?? 0
+    }
+
+    /// هل العادة مكتملة في يوم معين (وصلت للهدف)؟
+    func isCompleted(on date: Date) -> Bool {
+        progress(on: date) >= amountPerDay
+    }
+
+    /// عدد الأيام المتتالية المكتملة (تحسب بدءًا من اليوم رجوعًا للخلف)
+    var currentStreak: Int {
+        guard amountPerDay > 0 else { return 0 }
+        var streak = 0
+        var date = Date()
+        let calendar = Calendar.current
+
+        while isCompleted(on: date) {
+            streak += 1
+            guard let previousDay = calendar.date(byAdding: .day, value: -1, to: date) else { break }
+            date = previousDay
+        }
+        return streak
+    }
 }
 
 // MARK: - JournalEntry

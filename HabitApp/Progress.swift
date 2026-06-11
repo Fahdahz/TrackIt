@@ -29,34 +29,52 @@ private struct TrackProgressView: View {
         habits.first { $0.name == selectedFilter } ?? habits.first
     }
 
-    // Most consistent = highest completion ratio
+    // Most consistent = highest completion ratio TODAY
     private var mostConsistent: Habit? {
         habits.filter { !$0.isFrozen }.max { a, b in
-            (Double(a.completed) / Double(max(a.amountPerDay, 1))) <
-            (Double(b.completed) / Double(max(b.amountPerDay, 1)))
+            let aRatio = Double(a.progress(on: Date())) / Double(max(a.amountPerDay, 1))
+            let bRatio = Double(b.progress(on: Date())) / Double(max(b.amountPerDay, 1))
+            return aRatio < bRatio
         }
     }
 
-    // Needs attention = lowest completion ratio (not frozen, not 0 progress)
+    // Needs attention = lowest completion ratio TODAY (not frozen)
     private var needsAttention: Habit? {
         habits.filter { !$0.isFrozen }.min { a, b in
-            (Double(a.completed) / Double(max(a.amountPerDay, 1))) <
-            (Double(b.completed) / Double(max(b.amountPerDay, 1)))
+            let aRatio = Double(a.progress(on: Date())) / Double(max(a.amountPerDay, 1))
+            let bRatio = Double(b.progress(on: Date())) / Double(max(b.amountPerDay, 1))
+            return aRatio < bRatio
         }
     }
 
-    // Completed habits (100%)
+    // Completed habits TODAY (100%)
     private var completedHabits: [Habit] {
-        habits.filter { $0.completed >= $0.amountPerDay && !$0.isFrozen }
+        habits.filter { $0.isCompleted(on: Date()) && !$0.isFrozen }
     }
 
-    // Completion data for selected habit (mock: completed days = completed count from today back)
+    // Days in the displayed month where the selected habit reached its goal
     private var completedDays: Set<Int> {
         guard let habit = selectedHabit else { return [] }
-        let today = Calendar.current.component(.day, from: Date())
-        let count = min(habit.completed, today)
-        guard count > 0 else { return [] }
-        return Set((today - count + 1)...today)
+        var calendar = Calendar.current
+        calendar.firstWeekday = 2
+
+        guard
+            let range = calendar.range(of: .day, in: .month, for: currentMonth)
+        else { return [] }
+
+        let comps = calendar.dateComponents([.year, .month], from: currentMonth)
+        var result: Set<Int> = []
+
+        for day in range {
+            var dc = DateComponents()
+            dc.year = comps.year; dc.month = comps.month; dc.day = day
+            guard let date = calendar.date(from: dc) else { continue }
+
+            if habit.isCompleted(on: date) {
+                result.insert(day)
+            }
+        }
+        return result
     }
 
     var body: some View {
@@ -181,7 +199,7 @@ private struct CompletedCard: View {
                 Spacer(minLength: 0)
             }
 
-            Text("\(habit.completed) of \(habit.amountPerDay) daily goal")
+            Text("\(habit.progress(on: Date())) of \(habit.amountPerDay) daily goal")
                 .font(.system(size: 12, weight: .regular))
                 .foregroundStyle(AppTheme.textSecondary)
 
@@ -248,7 +266,7 @@ private struct MostConsistentCard: View {
                 Spacer()
             }
 
-            Text("\(habit.completed) completed today")
+            Text("\(habit.progress(on: Date())) completed today")
                 .font(.system(size: 13, weight: .regular))
                 .foregroundStyle(AppTheme.textSecondary)
         }
@@ -278,7 +296,7 @@ private struct NeedsAttentionCard: View {
                 Spacer()
             }
 
-            let remaining = habit.amountPerDay - habit.completed
+            let remaining = habit.amountPerDay - habit.progress(on: Date())
             Text(remaining > 0 ? "\(remaining) left today" : "All done!")
                 .font(.system(size: 13, weight: .regular))
                 .foregroundStyle(AppTheme.textSecondary)
@@ -489,8 +507,8 @@ private struct MonthDay: Identifiable {
 
 #Preview {
     Progress(habits: [
-        Habit(name: "Reading", icon: "📚", amountPerDay: 1, targetDate: Date(), remindersOn: false, completed: 1),
-        Habit(name: "Drinking water", icon: "💧", amountPerDay: 8, targetDate: Date(), remindersOn: false, completed: 5),
-        Habit(name: "Running", icon: "🏃🏻‍♀️", amountPerDay: 1, targetDate: Date(), remindersOn: false, completed: 0),
+        Habit(name: "Reading", icon: "📚", amountPerDay: 1, targetDate: Date(), remindersOn: false),
+        Habit(name: "Drinking water", icon: "💧", amountPerDay: 8, targetDate: Date(), remindersOn: false),
+        Habit(name: "Running", icon: "🏃🏻‍♀️", amountPerDay: 1, targetDate: Date(), remindersOn: false),
     ])
 }

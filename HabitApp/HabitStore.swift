@@ -21,6 +21,8 @@ class HabitStore: ObservableObject {
     }
 
     // MARK: - Daily Reset
+    // ملاحظة: ما عاد نحتاج تصفير completed يدويًا لأن التتبع صار عبر dailyProgress
+    // (كل يوم له مفتاحه الخاص تلقائيًا). أبقينا الدالة للحفاظ على تاريخ آخر فتح فقط.
 
     private func resetIfNewDay() {
         let calendar = Calendar.current
@@ -29,12 +31,11 @@ class HabitStore: ObservableObject {
         if let savedData = UserDefaults.standard.object(forKey: lastOpenKey) as? Date {
             let lastOpen = calendar.startOfDay(for: savedData)
             if lastOpen < today {
-                // New day — reset completed counts
-                resetDailyProgress()
+                // يوم جديد — ما نحتاج نسوي شي، dailyProgress يفصل تلقائيًا حسب التاريخ
             }
         }
 
-        // Always update last open date to today
+        // تحديث تاريخ آخر فتح دائمًا
         UserDefaults.standard.set(Date(), forKey: lastOpenKey)
     }
 
@@ -76,19 +77,20 @@ class HabitStore: ObservableObject {
         }
     }
 
+    /// يزيد عداد اليوم الحالي فقط لهذي العادة.
+    /// إذا وصل للهدف وضغط مرة ثانية، يرجع يصفر اليوم (toggle).
     func incrementCompleted(id: UUID) {
-        if let i = habits.firstIndex(where: { $0.id == id }) {
-            if !habits[i].isFrozen && habits[i].completed < habits[i].amountPerDay {
-                habits[i].completed += 1
-            }
-        }
-    }
+        guard let i = habits.firstIndex(where: { $0.id == id }) else { return }
+        guard !habits[i].isFrozen else { return }
 
-    func resetDailyProgress() {
-        for i in habits.indices {
-            if !habits[i].isFrozen {
-                habits[i].completed = 0
-            }
+        let key = Habit.dayKey(for: Date())
+        let current = habits[i].dailyProgress[key] ?? 0
+        let goal = habits[i].amountPerDay
+
+        if current < goal {
+            habits[i].dailyProgress[key] = current + 1
+        } else {
+            habits[i].dailyProgress[key] = 0
         }
     }
 }

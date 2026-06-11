@@ -228,11 +228,17 @@ struct HabitCard: View {
     let isSelected: Bool
     let onMenuTap: () -> Void
 
+    /// عدد مرات الإنجاز لليوم الحالي فقط (وليس مجموع كلي)
+    var todayCompleted: Int {
+        habit.progress(on: Date())
+    }
+
     var progress: Double {
         guard habit.amountPerDay > 0 else { return 0 }
-        return Double(habit.completed) / Double(habit.amountPerDay)
+        return Double(todayCompleted) / Double(habit.amountPerDay)
     }
-    var isCompleted: Bool { habit.completed >= habit.amountPerDay }
+
+    var isCompleted: Bool { todayCompleted >= habit.amountPerDay }
 
     var body: some View {
         VStack {
@@ -285,17 +291,17 @@ struct HabitCard: View {
                     .padding(.top, 18)
             } else {
                 Circle()
-                    .fill(habit.completed > 0 ? Color("PrimaryOrange") : Color.clear)
+                    .fill(todayCompleted > 0 ? Color("PrimaryOrange") : Color.clear)
                     .frame(width: 50, height: 50)
                     .overlay(Circle().stroke(Color("PrimaryOrange"), lineWidth: 2))
                     .overlay(Group {
-                        if habit.completed > 0 {
+                        if todayCompleted > 0 {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 26, weight: .regular))
                                 .foregroundColor(.white)
                         }
                     })
-                Text("\(habit.completed) out of \(habit.amountPerDay)")
+                Text("\(todayCompleted) out of \(habit.amountPerDay)")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundColor(.black)
                     .padding(.top, 8)
