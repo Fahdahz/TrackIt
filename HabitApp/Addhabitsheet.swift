@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import UserNotifications
 
 struct AddHabitSheet: View {
     @Environment(\.dismiss) private var dismiss
@@ -15,8 +16,10 @@ struct AddHabitSheet: View {
     @State private var amountPerDay: Int = 1
     @State private var targetDate: Date = Date()
     @State private var remindersOn: Bool = false
+    @State private var reminderTime: Date = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
     @State private var showEmojiPicker: Bool = false
     @State private var selectedEmoji: String = ""
+    @State private var showNotificationDeniedAlert: Bool = false
 
     // Edit mode support
     var editingHabit: Habit? = nil
@@ -30,6 +33,9 @@ struct AddHabitSheet: View {
             _targetDate    = State(initialValue: h.targetDate)
             _remindersOn   = State(initialValue: h.remindersOn)
             _selectedEmoji = State(initialValue: h.icon)
+            if let savedTime = h.reminderTime {
+                _reminderTime = State(initialValue: savedTime)
+            }
         }
     }
 
@@ -130,16 +136,41 @@ struct AddHabitSheet: View {
             .padding(.horizontal, 24)
 
             // Reminders
-            HStack {
-                Text("Reminders")
-                    .font(.system(size: 17))
-                    .foregroundColor(.black)
-                Spacer()
-                Toggle("", isOn: $remindersOn)
-                    .tint(Color("PrimaryOrange"))
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Reminders")
+                        .font(.system(size: 17))
+                        .foregroundColor(.black)
+                    Spacer()
+                    Toggle("", isOn: $remindersOn)
+                        .tint(Color("PrimaryOrange"))
+                        .onChange(of: remindersOn) { _, newValue in
+                            if newValue {
+                                requestNotificationPermission()
+                            }
+                        }
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 18)
+
+                if remindersOn {
+                    Divider()
+                        .padding(.horizontal, 18)
+
+                    HStack {
+                        Text("Time")
+                            .font(.system(size: 17))
+                            .foregroundColor(.black)
+                        Spacer()
+                        DatePicker("", selection: $reminderTime, displayedComponents: .hourAndMinute)
+                            .labelsHidden()
+                            .datePickerStyle(.compact)
+                            .tint(Color("PrimaryOrange"))
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 18)
+                }
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 18)
             .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color("BackgroundCream")))
             .padding(.horizontal, 24)
 
@@ -157,10 +188,20 @@ struct AddHabitSheet: View {
                     completed: editingHabit?.completed ?? 0,
                     isFrozen: editingHabit?.isFrozen ?? false
                 )
+                habit.reminderTime = remindersOn ? reminderTime : nil
+
                 // Keep the same id when editing so store.update() finds it
                 if let existing = editingHabit {
                     habit.id = existing.id
                 }
+
+                // Schedule or cancel the local notification
+                if remindersOn {
+                    scheduleReminder(for: habit)
+                } else {
+                    cancelReminder(for: habit)
+                }
+
                 onAdd(habit)
                 dismiss()
             } label: {
@@ -179,6 +220,72 @@ struct AddHabitSheet: View {
             EmojiPickerView(selectedEmoji: $selectedEmoji)
                 .presentationDetents([.medium])
         }
+        .alert("Notifications Disabled", isPresented: $showNotificationDeniedAlert) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                remindersOn = false
+            }
+        } message: {
+            Text("To get reminders for this habit, please enable notifications in Settings.")
+        }
+    }
+
+    // MARK: - Notification Helpers
+
+    private func requestNotificationPermission() {
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                switch settings.authorizationStatus {
+                case .authorized, .provisional, .ephemeral:
+                    break // already allowed, nothing to do
+                case .notDetermined:
+                    center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+                        DispatchQueue.main.async {
+                            if !granted {
+                                remindersOn = false
+                            }
+                        }
+                    }
+                case .denied:
+                    showNotificationDeniedAlert = true
+                @unknown default:
+                    break
+                }
+            }
+        }
+    }
+
+    private func scheduleReminder(for habit: Habit) {
+        let center = UNUserNotificationCenter.current()
+        let identifier = "habit-reminder-\(habit.id.uuidString)"
+
+        // Remove any existing reminder for this habit before scheduling a new one
+        center.removePendingNotificationRequests(withIdentifiers: [identifier])
+
+        let content = UNMutableNotificationContent()
+        content.title = "\(habit.icon) \(habit.name)"
+        content.body = "Time to work on your habit: \(habit.name)"
+        content.sound = .default
+
+        let components = Calendar.current.dateComponents([.hour, .minute], from: reminderTime)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+        center.add(request) { error in
+            if let error = error {
+                print("Failed to schedule reminder: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func cancelReminder(for habit: Habit) {
+        let identifier = "habit-reminder-\(habit.id.uuidString)"
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [identifier])
     }
 }
 

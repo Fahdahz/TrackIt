@@ -17,6 +17,7 @@ struct Habit: Identifiable, Codable {
     var remindersOn: Bool
     var completed: Int = 0
     var isFrozen: Bool = false
+    var reminderTime: Date? = nil
 }
 
 // MARK: - JournalEntry
